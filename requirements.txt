@@ -1,0 +1,9 @@
+# ClearMark dependencies — installed automatically by the setup script.
+flask>=3.0
+numpy>=1.26
+opencv-python-headless>=4.9
+pillow>=10.0
+torch>=2.2
+imageio-ffmpeg>=0.4.9
+pywebview[gtk]>=5.0; sys_platform == "linux"
+pywebview>=5.0; sys_platform == "win32"

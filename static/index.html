@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClearMark — AI Watermark Remover</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='24' fill='%23141413'/%3E%3Crect x='12' y='14' width='24' height='20' rx='5' stroke='%23F3F0EE' stroke-width='2.2' fill='none'/%3E%3Ccircle cx='18.5' cy='20' r='2.2' fill='%23F3F0EE'/%3E%3Cpath d='M13.5 30.5l5.2-5.2 4 4 4.6-4.6 6.2 6.2' stroke='%23F3F0EE' stroke-width='2.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='35' cy='34' r='6.4' fill='%23141413'/%3E%3Crect x='31.4' y='31.6' width='5' height='5' rx='1.4' fill='%23F37338'/%3E%3Crect x='37.6' y='32.6' width='3' height='3' rx='0.9' fill='%23F37338' opacity='0.6'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/fonts.css">
+<style>
+  :root {
+    --canvas: #F3F0EE; --lifted: #FCFBFA; --white: #FFFFFF;
+    --ink: #141413; --charcoal: #262627; --slate: #696969; --taupe: #D1CDC7;
+    --ghost: #E8E2DA; --line: rgba(20, 20, 19, 0.14);
+    --signal: #CF4500; --arc: #F37338; --link: #3860BE;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--canvas); color: var(--ink); min-height: 100vh;
+    font-family: "Sofia Sans", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    font-weight: 450; display: flex; flex-direction: column; align-items: center;
+  }
+  /* ---------- floating nav pill ---------- */
+  nav {
+    margin-top: 24px; width: min(1080px, calc(100% - 32px));
+    background: var(--white); border-radius: 999px;
+    box-shadow: rgba(0, 0, 0, 0.04) 0px 4px 24px 0px;
+    padding: 14px 28px; display: flex; align-items: center; gap: 14px;
+  }
+  .logo { width: 56px; height: 56px; flex: none; display: block; }
+  .brandtext { display: flex; flex-direction: column; gap: 3px; line-height: 1; }
+  .wordmark { font-size: 27px; font-weight: 700; letter-spacing: -0.6px; }
+  .byline {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+    text-transform: uppercase; color: var(--slate); white-space: nowrap;
+  }
+  .byline b { color: var(--ink); font-weight: 700; }
+  nav .spacer { flex: 1; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 13px;
+    font-weight: 500; color: var(--slate); background: var(--white);
+    border: 1px solid var(--line); border-radius: 999px; padding: 8px 18px;
+    white-space: nowrap;
+  }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--taupe); flex: none; }
+  .pill.live { color: var(--ink); }
+  .pill.live .dot { background: var(--arc); }
+  .pill b { font-weight: 700; }
+  /* ---------- hero ---------- */
+  .hero {
+    position: relative; text-align: center; width: min(900px, calc(100% - 40px));
+    padding: 64px 0 4px; display: flex; flex-direction: column; align-items: center;
+  }
+  .hero > * { position: relative; z-index: 1; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.56px; text-transform: uppercase;
+    color: var(--ink); background: var(--white); border-radius: 999px;
+    padding: 9px 20px; box-shadow: rgba(0, 0, 0, 0.04) 0px 4px 24px 0px;
+  }
+  .eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--arc); flex: none; }
+  h1 {
+    margin-top: 26px; font-size: clamp(34px, 5.4vw, 60px); font-weight: 500;
+    line-height: 1.06; letter-spacing: -0.02em; text-wrap: balance;
+  }
+  .sub { margin-top: 20px; font-size: 17px; font-weight: 450; color: var(--slate); line-height: 1.5; }
+  /* ---------- tabs ---------- */
+  .tabs {
+    display: inline-flex; gap: 4px; margin-top: 36px; padding: 5px;
+    background: var(--white); border-radius: 999px;
+    box-shadow: rgba(0, 0, 0, 0.04) 0px 4px 24px 0px;
+  }
+  .tab {
+    border: 0; background: transparent; color: var(--slate);
+    font-size: 15px; font-weight: 500; letter-spacing: -0.3px;
+    border-radius: 999px; padding: 11px 26px; cursor: pointer; transition: none;
+  }
+  .tab.on { background: var(--ink); color: var(--canvas); }
+  .panel { display: none; width: 100%; flex-direction: column; align-items: center; }
+  .panel.on { display: flex; }
+  /* ---------- steps ---------- */
+  .steps { display: flex; gap: 28px; margin: 40px 0 28px; flex-wrap: wrap; justify-content: center; }
+  .step { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 450; color: var(--ink); }
+  .step .n {
+    width: 26px; height: 26px; border-radius: 50%; flex: none; font-size: 12px; font-weight: 700;
+    display: grid; place-items: center; color: var(--ink);
+    background: var(--white); border: 1.5px solid var(--ink);
+  }
+  /* ---------- drop zone ---------- */
+  .drop {
+    width: min(720px, calc(100% - 40px)); border: 1.5px dashed rgba(20,20,19,.3);
+    border-radius: 40px; background: var(--lifted);
+    padding: 64px 24px; text-align: center; cursor: pointer;
+    transition: border-color .15s, box-shadow .2s;
+  }
+  .drop:hover, .drop.over {
+    border-color: var(--ink);
+    box-shadow: rgba(0, 0, 0, 0.08) 0px 24px 48px 0px;
+  }
+  .drop .icon {
+    width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 18px;
+    background: var(--ink); color: var(--canvas); font-size: 26px;
+    display: grid; place-items: center;
+  }
+  .drop p { color: var(--slate); font-size: 15px; line-height: 1.6; font-weight: 450; }
+  .drop strong { color: var(--ink); font-weight: 600; font-size: 17px; }
+  .drop .types { font-size: 12.5px; color: var(--taupe); letter-spacing: 0.56px; margin-top: 12px; font-weight: 700; }
+  /* ---------- stage ---------- */
+  .stage { display: none; width: fit-content; max-width: min(960px, calc(100% - 32px)); }
+  .stage.active { display: block; }
+  .card {
+    background: var(--white); border-radius: 40px;
+    padding: 32px; box-shadow: rgba(0, 0, 0, 0.08) 0px 24px 48px 0px;
+  }
+  .hint { font-size: 14px; font-weight: 450; color: var(--slate); margin-bottom: 16px; }
+  .hint b { color: var(--ink); font-weight: 600; }
+  .media-wrap { position: relative; display: block; width: fit-content; max-width: 100%; margin: 0 auto; line-height: 0; }
+  .media-wrap img, .media-wrap video { max-width: 100%; max-height: 56vh; border-radius: 24px; display: block; }
+  #box {
+    position: absolute; border: 2px solid var(--arc); border-radius: 6px;
+    background: rgba(243, 115, 56, 0.15); cursor: move; touch-action: none;
+  }
+  #box .handle {
+    position: absolute; right: -9px; bottom: -9px; width: 17px; height: 17px;
+    background: var(--arc); border: 2.5px solid var(--white); border-radius: 50%; cursor: nwse-resize;
+  }
+  .row { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; align-items: center; }
+  button {
+    font-family: inherit; font-weight: 500; font-size: 16px; letter-spacing: -0.32px;
+    border-radius: 20px; padding: 11px 26px; cursor: pointer;
+    background: var(--ink); color: var(--canvas); border: 1.5px solid var(--ink);
+    transition: transform .1s;
+  }
+  button:active:not(:disabled) { transform: scale(0.98); }
+  button.ghost { background: var(--white); color: var(--ink); font-weight: 450; }
+  button.abort {
+    display: none; background: var(--white); color: var(--signal);
+    border: 1.5px solid var(--signal); font-weight: 450;
+  }
+  button.abort.active { display: inline-block; }
+  button:disabled { opacity: .45; cursor: wait; }
+  #status { font-size: 14px; font-weight: 450; color: var(--slate); }
+  #status.ok { color: var(--ink); font-weight: 600; }
+  #status.err { color: var(--signal); }
+  /* ---------- progress ---------- */
+  .progress { display: none; width: 100%; margin-top: 20px; }
+  .progress.active { display: block; }
+  .bar-track { width: 100%; height: 10px; background: var(--ghost); border-radius: 999px; overflow: hidden; }
+  .bar-fill { height: 100%; width: 0%; border-radius: 999px; background: var(--ink); transition: width .3s ease; }
+  .bar-fill.indeterminate { width: 30%; animation: slide 1.2s ease-in-out infinite alternate; }
+  @keyframes slide { from { margin-left: 0; } to { margin-left: 70%; } }
+  .bar-label { font-size: 13px; font-weight: 450; color: var(--slate); margin-top: 9px; }
+  .bar-label b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* ---------- result ---------- */
+  .result { margin-top: 26px; display: none; }
+  .result.active { display: block; }
+  .result .done-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px;
+    font-size: 14px; font-weight: 700; letter-spacing: 0.56px; text-transform: uppercase; color: var(--ink);
+  }
+  .result .done-eyebrow::before { content: "✓"; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--ink); color: var(--canvas); font-size: 12px; display: grid; place-items: center; }
+  .result img, .result video { max-width: 100%; max-height: 56vh; border-radius: 24px; display: block; }
+  a.dl {
+    display: inline-flex; align-items: center; gap: 9px; margin-top: 18px;
+    color: var(--canvas); font-size: 16px; font-weight: 500; letter-spacing: -0.32px;
+    text-decoration: none; background: var(--ink); border: 1.5px solid var(--ink);
+    border-radius: 20px; padding: 11px 26px;
+  }
+  a.dl:active { transform: scale(0.98); }
+  /* ---------- detect report ---------- */
+  .verdict-card {
+    border-radius: 40px; padding: 32px; text-align: center;
+    background: var(--ink); color: var(--canvas); margin-bottom: 24px;
+  }
+  .verdict-card.ai { background: var(--signal); color: var(--white); }
+  .verdict-card.camera { background: var(--ink); }
+  .verdict-card.unknown { background: var(--ghost); color: var(--ink); }
+  .verdict-card .vlabel {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.56px;
+    text-transform: uppercase; opacity: .72;
+  }
+  .verdict-card .vname {
+    font-size: clamp(26px, 4vw, 38px); font-weight: 500;
+    letter-spacing: -0.02em; margin: 10px 0 12px; line-height: 1.1;
+  }
+  .verdict-card .vsum { font-size: 15px; font-weight: 450; opacity: .88; line-height: 1.5;
+    max-width: 620px; margin: 0 auto; }
+  .verdict-card .vconf {
+    display: inline-block; margin-top: 16px; font-size: 12.5px; font-weight: 700;
+    letter-spacing: 0.56px; text-transform: uppercase;
+    border: 1px solid currentColor; border-radius: 999px; padding: 6px 16px; opacity: .8;
+  }
+  .signal {
+    display: flex; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--line);
+    text-align: left;
+  }
+  .signal:last-child { border-bottom: 0; }
+  .signal .badge {
+    flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: .5px;
+    text-transform: uppercase; border-radius: 999px; padding: 5px 11px; height: fit-content;
+    background: var(--ghost); color: var(--slate);
+  }
+  .signal .badge.strong { background: var(--ink); color: var(--canvas); }
+  .signal .badge.medium { background: var(--arc); color: var(--white); }
+  .signal h4 { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; }
+  .signal p { font-size: 13.5px; font-weight: 450; color: var(--slate); margin-top: 5px;
+    line-height: 1.5; word-break: break-word; }
+  .disclaimer {
+    margin-top: 22px; padding: 18px 22px; border-radius: 24px;
+    background: var(--canvas); font-size: 13.5px; font-weight: 450;
+    color: var(--slate); line-height: 1.6; text-align: left;
+  }
+  .disclaimer b { color: var(--ink); font-weight: 600; }
+  .cpunote {
+    display: none; max-width: 620px; margin: 0 auto 4px;
+    font-size: 13px; font-weight: 450; color: var(--slate); line-height: 1.55;
+    background: var(--white); border-radius: 24px; padding: 14px 22px;
+    box-shadow: rgba(0, 0, 0, 0.04) 0px 4px 24px 0px;
+  }
+  .cpunote b { color: var(--ink); font-weight: 600; }
+  details.rawmeta { margin-top: 18px; text-align: left; }
+  details.rawmeta summary {
+    cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink);
+    list-style: none; padding: 12px 0;
+  }
+  details.rawmeta summary::before { content: "▸ "; color: var(--arc); }
+  details[open].rawmeta summary::before { content: "▾ "; }
+  .metatable { font-size: 12.5px; max-height: 320px; overflow: auto; }
+  .metatable div { display: flex; gap: 14px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .metatable .k { flex: none; width: 40%; font-weight: 600; color: var(--ink); word-break: break-word; }
+  .metatable .v { color: var(--slate); word-break: break-word; font-weight: 450; }
+  /* ---------- footer ---------- */
+  footer {
+    margin-top: auto; width: 100%; background: var(--ink); color: var(--white);
+    padding: 64px 48px 56px; text-align: center; margin-top: 88px;
+  }
+  footer .big {
+    font-size: clamp(24px, 3.4vw, 36px); font-weight: 500; letter-spacing: -0.02em; line-height: 1.2;
+    color: var(--canvas);
+  }
+  footer .credit { margin-top: 22px; font-size: 15px; font-weight: 450; color: rgba(255,255,255,.85); }
+  footer .credit b { font-weight: 700; color: var(--white); }
+  footer .divider { width: min(560px, 80%); height: 1px; background: rgba(255,255,255,.3); margin: 28px auto; }
+  footer .tech { font-size: 12.5px; font-weight: 450; color: rgba(255,255,255,.5); }
+  @media (max-width: 640px) {
+    nav { padding: 12px 16px; gap: 10px; }
+    .logo { width: 44px; height: 44px; }
+    .wordmark { font-size: 21px; }
+    .byline { font-size: 10.5px; }
+    .pill { font-size: 11.5px; padding: 7px 13px; }
+    .steps { gap: 14px; }
+    .card { padding: 20px; border-radius: 28px; }
+    footer { padding: 48px 24px 40px; }
+  }
+</style>
+</head>
+<body>
+  <nav>
+    <svg class="logo" viewBox="0 0 48 48" fill="none" aria-label="ClearMark logo">
+      <circle cx="24" cy="24" r="24" fill="#141413"/>
+      <!-- image frame -->
+      <rect x="12" y="14" width="24" height="20" rx="5" stroke="#F3F0EE" stroke-width="2.2"/>
+      <!-- horizon + sun inside the frame: this is a picture -->
+      <circle cx="18.5" cy="20" r="2.2" fill="#F3F0EE"/>
+      <path d="M13.5 30.5l5.2-5.2 4 4 4.6-4.6 6.2 6.2" stroke="#F3F0EE" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- the watermark, dissolving away from the corner -->
+      <circle cx="35" cy="34" r="6.4" fill="#141413"/>
+      <rect x="31.4" y="31.6" width="5" height="5" rx="1.4" fill="#F37338"/>
+      <rect x="37.6" y="32.6" width="3" height="3" rx="0.9" fill="#F37338" opacity="0.6"/>
+      <rect x="41.4" y="33.4" width="1.8" height="1.8" rx="0.6" fill="#F37338" opacity="0.3"/>
+    </svg>
+    <div class="brandtext">
+      <span class="wordmark">ClearMark</span>
+      <span class="byline">by <b>DelNex</b></span>
+    </div>
+    <div class="spacer"></div>
+    <span class="pill" id="devicePill"><span class="dot"></span><span id="deviceText">Detecting hardware…</span></span>
+  </nav>
+
+  <section class="hero">
+    <span class="eyebrow" id="heroEyebrow">AI Watermark Remover</span>
+    <h1 id="heroTitle">Remove any watermark.<br>Every pixel stays yours.</h1>
+    <p class="sub" id="heroSub">Clean watermarks off images and videos with AI inpainting —<br>running 100% on your own computer. Nothing is ever uploaded.</p>
+    <div class="tabs">
+      <button class="tab on" data-tab="remove">Remove Watermark</button>
+      <button class="tab" data-tab="detect">AI Content Check</button>
+    </div>
+  </section>
+
+  <!-- ============ TAB 1: REMOVE ============ -->
+  <div class="panel on" id="panel-remove">
+    <p class="cpunote" id="cpuNote"><b>No compatible GPU found — running on CPU.</b>
+      Images still take only a few seconds. Video works too, but expect roughly
+      2–5 seconds per frame, so start with a short clip.</p>
+    <div class="steps">
+      <div class="step"><span class="n">1</span>Drop your file</div>
+      <div class="step"><span class="n">2</span>Place the box on the watermark</div>
+      <div class="step"><span class="n">3</span>Remove &amp; download</div>
+    </div>
+
+    <div class="drop" id="drop">
+      <div class="icon">↓</div>
+      <p><strong>Drop an image or video here</strong><br>or click to choose a file</p>
+      <p class="types">PNG · JPG · WEBP · MP4 · MOV · WEBM</p>
+      <input type="file" id="file" accept="image/*,video/*" hidden>
+    </div>
+
+    <div class="stage" id="stage">
+      <div class="card">
+        <p class="hint"><b>Drag the orange box</b> over the watermark — the corner dot resizes it. Keep it snug for the best result.</p>
+        <div class="media-wrap" id="wrap">
+          <div id="box"><div class="handle" id="handle"></div></div>
+        </div>
+        <div class="row">
+          <button id="go">Remove watermark</button>
+          <button class="abort" id="abort">✕ Abort</button>
+          <button class="ghost" id="reset">New file</button>
+          <span class="pill" id="devicePill2"><span class="dot"></span><span class="dtext">Detecting hardware…</span></span>
+          <span id="status"></span>
+        </div>
+        <div class="progress" id="progress">
+          <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+          <div class="bar-label" id="barLabel"></div>
+        </div>
+        <div class="result" id="result">
+          <span class="done-eyebrow">Watermark removed</span>
+          <div id="resultMedia"></div>
+          <a class="dl" id="dl" href="#">Save cleaned file ↓</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TAB 2: AI CONTENT CHECK ============ -->
+  <div class="panel" id="panel-detect">
+    <div class="steps">
+      <div class="step"><span class="n">1</span>Drop any image or video</div>
+      <div class="step"><span class="n">2</span>ClearMark reads its provenance data</div>
+      <div class="step"><span class="n">3</span>Read the evidence report</div>
+    </div>
+
+    <div class="drop" id="dropDetect">
+      <div class="icon">⌕</div>
+      <p><strong>Drop a file to check its origin</strong><br>or click to choose a file</p>
+      <p class="types">READS CONTENT CREDENTIALS · EXIF · XMP · GENERATOR TAGS</p>
+      <input type="file" id="fileDetect" accept="image/*,video/*" hidden>
+    </div>
+
+    <div class="stage" id="stageDetect">
+      <div class="card">
+        <div class="row" style="margin-top:0; margin-bottom:18px;">
+          <button class="ghost" id="resetDetect">Check another file</button>
+          <span class="pill"><span class="dot" style="background:var(--arc)"></span><span id="scanName">—</span></span>
+        </div>
+        <div id="detectBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p class="big">Your pixels. Your machine.<br>No cloud, no fees, no uploads.</p>
+    <p class="credit">Designed &amp; Developed by <b>DelNex</b></p>
+    <div class="divider"></div>
+    <p class="tech" id="techLine">ClearMark · LaMa AI inpainting · ffmpeg · 100% local processing</p>
+  </footer>
+
+<script>
+const AUTH_TOKEN = '<!-- CLEARMARK_TOKEN -->';
+const apiFetch = (url, options = {}) => fetch(url, {
+  ...options,
+  headers: { ...(options.headers || {}), 'X-ClearMark-Token': AUTH_TOKEN },
+});
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+const stage = document.getElementById('stage');
+const wrap = document.getElementById('wrap');
+const box = document.getElementById('box');
+const handle = document.getElementById('handle');
+const go = document.getElementById('go');
+const resetBtn = document.getElementById('reset');
+const statusEl = document.getElementById('status');
+const result = document.getElementById('result');
+const resultMedia = document.getElementById('resultMedia');
+const dl = document.getElementById('dl');
+const progressEl = document.getElementById('progress');
+const barFill = document.getElementById('barFill');
+const barLabel = document.getElementById('barLabel');
+const abortBtn = document.getElementById('abort');
+let currentJob = null;
+let resultJob = null;
+
+let currentFile = null, media = null;
+let natural = { w: 0, h: 0 };          // real pixel size of the media
+let b = { x: 0, y: 0, w: 0, h: 0 };    // box in natural pixels
+
+// hardware badge — shown in the nav and next to the action row
+fetch('/info').then(r => r.json()).then(i => {
+  let label, tech;
+  if (i.device === 'cuda') {
+    label = 'Running on <b>' + i.accelerator + '</b>';
+    tech = 'LaMa AI inpainting on ' + i.accelerator + ' (CUDA)';
+  } else if (i.device === 'mps') {
+    label = 'Running on <b>' + i.chip + ' GPU</b>';
+    tech = 'LaMa AI inpainting on ' + i.chip + ' GPU (Metal)';
+  } else {
+    label = 'Running on <b>CPU</b> · ' + i.cores + ' cores';
+    tech = 'LaMa AI inpainting on CPU · ' + i.cores + ' cores';
+  }
+  for (const id of ['devicePill', 'devicePill2']) {
+    const pill = document.getElementById(id);
+    pill.classList.add('live');
+    pill.querySelector(id === 'devicePill' ? '#deviceText' : '.dtext').innerHTML = label;
+  }
+  document.getElementById('techLine').textContent =
+    'ClearMark · ' + tech + ' · 100% local processing';
+  if (i.device === 'cpu') {
+    document.getElementById('cpuNote').style.display = 'block';
+  }
+}).catch(() => {
+  document.getElementById('deviceText').textContent = 'Hardware: unknown';
+});
+
+// tab switching
+const HERO = {
+  remove: {
+    eyebrow: 'AI Watermark Remover',
+    title: 'Remove any watermark.<br>Every pixel stays yours.',
+    sub: 'Clean watermarks off images and videos with AI inpainting —<br>running 100% on your own computer. Nothing is ever uploaded.',
+  },
+  detect: {
+    eyebrow: 'AI Content Check',
+    title: 'Where did this<br>file really come from?',
+    sub: 'Read the Content Credentials, EXIF and generator tags a file carries —<br>the evidence, with none of the guesswork.',
+  },
+};
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
+    const name = t.dataset.tab;
+    document.querySelectorAll('.panel').forEach(p =>
+      p.classList.toggle('on', p.id === 'panel-' + name));
+    document.getElementById('heroEyebrow').textContent = HERO[name].eyebrow;
+    document.getElementById('heroTitle').innerHTML = HERO[name].title;
+    document.getElementById('heroSub').innerHTML = HERO[name].sub;
+  });
+});
+
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => fileInput.files[0] && loadFile(fileInput.files[0]));
+
+function loadFile(file) {
+  currentFile = file;
+  result.classList.remove('active');
+  statusEl.textContent = ''; statusEl.className = '';
+  if (media) media.remove();
+  const url = URL.createObjectURL(file);
+  const isVideo = file.type.startsWith('video');
+  media = document.createElement(isVideo ? 'video' : 'img');
+  media.src = url;
+  if (isVideo) { media.controls = true; media.playsInline = true; }
+  media.addEventListener(isVideo ? 'loadedmetadata' : 'load', () => {
+    natural.w = isVideo ? media.videoWidth : media.naturalWidth;
+    natural.h = isVideo ? media.videoHeight : media.naturalHeight;
+    // default box: bottom-right corner, where Gemini / Veo watermarks live
+    b.w = Math.max(80, Math.round(natural.w * 0.20));
+    b.h = Math.max(40, Math.round(natural.h * 0.09));
+    b.x = natural.w - b.w - Math.round(natural.w * 0.02);
+    b.y = natural.h - b.h - Math.round(natural.h * 0.02);
+    drop.style.display = 'none';
+    stage.classList.add('active');
+    requestAnimationFrame(drawBox);
+  }, { once: true });
+  wrap.insertBefore(media, box);
+}
+
+function scale() { return media.clientWidth / natural.w; }
+
+function drawBox() {
+  const s = scale();
+  box.style.left = (b.x * s) + 'px';
+  box.style.top = (b.y * s) + 'px';
+  box.style.width = (b.w * s) + 'px';
+  box.style.height = (b.h * s) + 'px';
+}
+window.addEventListener('resize', () => media && drawBox());
+
+let drag = null;
+box.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  box.setPointerCapture(e.pointerId);
+  const resizing = e.target === handle;
+  drag = { sx: e.clientX, sy: e.clientY, ox: b.x, oy: b.y, ow: b.w, oh: b.h, resizing };
+});
+box.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const s = scale();
+  const dx = (e.clientX - drag.sx) / s, dy = (e.clientY - drag.sy) / s;
+  if (drag.resizing) {
+    b.w = Math.min(natural.w - b.x, Math.max(24, drag.ow + dx));
+    b.h = Math.min(natural.h - b.y, Math.max(24, drag.oh + dy));
+  } else {
+    b.x = Math.min(natural.w - b.w, Math.max(0, drag.ox + dx));
+    b.y = Math.min(natural.h - b.h, Math.max(0, drag.oy + dy));
+  }
+  drawBox();
+});
+box.addEventListener('pointerup', () => drag = null);
+
+function fmtEta(sec) {
+  if (sec < 60) return Math.ceil(sec) + 's';
+  return Math.floor(sec / 60) + 'm ' + Math.round(sec % 60) + 's';
+}
+
+function pollProgress(job, isVideo) {
+  const started = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = async () => {
+      let p;
+      try {
+        p = await (await apiFetch('/progress/' + job)).json();
+      } catch (e) { return setTimeout(tick, 1000); }  // transient — keep polling
+      if (p.status === 'error') return reject(new Error(p.error || 'processing failed'));
+      if (p.status === 'cancelled') {
+        const e = new Error('cancelled'); e.cancelled = true;
+        return reject(e);
+      }
+      if (p.status === 'done') {
+        barFill.classList.remove('indeterminate');
+        barFill.style.width = '100%';
+        barLabel.innerHTML = '<b>100%</b> — finishing up…';
+        return resolve();
+      }
+      if (isVideo && p.total && p.done > 0) {
+        const pct = Math.min(99, p.done / p.total * 100);
+        const elapsed = (Date.now() - started) / 1000;
+        const eta = elapsed / p.done * (p.total - p.done);
+        barFill.classList.remove('indeterminate');
+        barFill.style.width = pct + '%';
+        barLabel.innerHTML = '<b>' + pct.toFixed(0) + '%</b> · frame ' + p.done +
+          ' / ' + p.total + ' · ~' + fmtEta(eta) + ' left';
+      } else if (isVideo) {
+        barLabel.textContent = 'Starting up the AI model…';
+      }
+      setTimeout(tick, 500);
+    };
+    tick();
+  });
+}
+
+go.addEventListener('click', async () => {
+  if (!currentFile) return;
+  go.disabled = true;
+  const isVideo = currentFile.type.startsWith('video');
+  statusEl.textContent = ''; statusEl.className = '';
+  result.classList.remove('active');
+  progressEl.classList.add('active');
+  barFill.classList.add('indeterminate');
+  barFill.style.width = '30%';
+  barLabel.textContent = isVideo ? 'Uploading & starting…' : 'AI-inpainting…';
+
+  const fd = new FormData();
+  fd.append('file', currentFile);
+  fd.append('x', Math.round(b.x)); fd.append('y', Math.round(b.y));
+  fd.append('w', Math.round(b.w)); fd.append('h', Math.round(b.h));
+
+  try {
+    const res = await apiFetch('/process', { method: 'POST', body: fd });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || res.statusText);
+    }
+    const { job } = await res.json();
+    currentJob = job;
+    resultJob = job;
+    abortBtn.classList.add('active');
+    await pollProgress(job, isVideo);
+    const fileRes = await apiFetch('/result/' + job);
+    if (!fileRes.ok) throw new Error('could not fetch result');
+    const blob = await fileRes.blob();
+    const url = URL.createObjectURL(blob);
+    resultMedia.innerHTML = '';
+    const out = document.createElement(isVideo ? 'video' : 'img');
+    out.src = url;
+    if (isVideo) { out.controls = true; out.playsInline = true; }
+    resultMedia.appendChild(out);
+    result.classList.add('active');
+    statusEl.textContent = 'Done'; statusEl.className = 'ok';
+  } catch (err) {
+    if (err.cancelled) {
+      statusEl.textContent = 'Aborted'; statusEl.className = '';
+    } else {
+      statusEl.textContent = 'Failed: ' + err.message; statusEl.className = 'err';
+    }
+  } finally {
+    go.disabled = false;
+    currentJob = null;
+    abortBtn.classList.remove('active');
+    progressEl.classList.remove('active');
+    barFill.classList.remove('indeterminate');
+    barFill.style.width = '0%';
+  }
+});
+
+abortBtn.addEventListener('click', () => {
+  if (!currentJob) return;
+  abortBtn.disabled = true;
+  apiFetch('/cancel/' + currentJob, { method: 'POST' })
+    .finally(() => abortBtn.disabled = false);
+});
+
+dl.addEventListener('click', async e => {
+  e.preventDefault();
+  if (!resultJob || !window.pywebview || !window.pywebview.api) {
+    statusEl.textContent = 'Save As is available in the ClearMark desktop window.';
+    statusEl.className = 'err';
+    return;
+  }
+  const saved = await window.pywebview.api.save_file(resultJob);
+  if (saved && saved.ok) {
+    statusEl.textContent = 'Saved';
+    statusEl.className = 'ok';
+    resultJob = null;
+  } else if (saved && saved.error) {
+    statusEl.textContent = 'Could not save: ' + saved.error;
+    statusEl.className = 'err';
+  }
+});
+
+resetBtn.addEventListener('click', () => {
+  stage.classList.remove('active');
+  drop.style.display = '';
+  result.classList.remove('active');
+  if (media) { media.remove(); media = null; }
+  currentFile = null; fileInput.value = '';
+});
+
+/* ============ TAB 2: AI content check ============ */
+const dropDetect = document.getElementById('dropDetect');
+const fileDetect = document.getElementById('fileDetect');
+const stageDetect = document.getElementById('stageDetect');
+const detectBody = document.getElementById('detectBody');
+const scanName = document.getElementById('scanName');
+
+dropDetect.addEventListener('click', () => fileDetect.click());
+dropDetect.addEventListener('dragover', e => { e.preventDefault(); dropDetect.classList.add('over'); });
+dropDetect.addEventListener('dragleave', () => dropDetect.classList.remove('over'));
+dropDetect.addEventListener('drop', e => {
+  e.preventDefault(); dropDetect.classList.remove('over');
+  if (e.dataTransfer.files[0]) scanFile(e.dataTransfer.files[0]);
+});
+fileDetect.addEventListener('change', () => fileDetect.files[0] && scanFile(fileDetect.files[0]));
+
+document.getElementById('resetDetect').addEventListener('click', () => {
+  stageDetect.classList.remove('active');
+  dropDetect.style.display = '';
+  fileDetect.value = '';
+});
+
+const esc = s => String(s).replace(/[&<>"]/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function scanFile(file) {
+  dropDetect.style.display = 'none';
+  stageDetect.classList.add('active');
+  scanName.textContent = file.name;
+  detectBody.innerHTML = '<div class="progress active"><div class="bar-track">' +
+    '<div class="bar-fill indeterminate"></div></div>' +
+    '<div class="bar-label">Reading provenance metadata…</div></div>';
+
+  const fd = new FormData();
+  fd.append('file', file);
+  let r;
+  try {
+    const res = await apiFetch('/detect', { method: 'POST', body: fd });
+    r = await res.json();
+    if (!res.ok) throw new Error(r.error || res.statusText);
+  } catch (err) {
+    detectBody.innerHTML = '<p class="hint" style="color:var(--signal)">Could not scan: ' +
+      esc(err.message) + '</p>';
+    return;
+  }
+
+  const tone = r.verdict.includes('AI') ? 'ai'
+             : r.verdict.includes('camera') ? 'camera' : 'unknown';
+
+  let html = '<div class="verdict-card ' + tone + '">' +
+    '<div class="vlabel">Verdict</div>' +
+    '<div class="vname">' + esc(r.verdict) + '</div>' +
+    '<div class="vsum">' + esc(r.summary) + '</div>' +
+    '<div class="vconf">' + esc(r.confidence) + ' confidence</div></div>';
+
+  if (r.signals.length) {
+    html += '<h3 style="font-size:14px;font-weight:700;letter-spacing:.56px;' +
+      'text-transform:uppercase;margin-bottom:4px">Evidence found</h3>';
+    for (const s of r.signals) {
+      html += '<div class="signal"><span class="badge ' + esc(s.level) + '">' +
+        esc(s.level) + '</span><div><h4>' + esc(s.title) + '</h4>' +
+        (s.detail ? '<p>' + esc(s.detail) + '</p>' : '') + '</div></div>';
+    }
+  } else {
+    html += '<div class="signal"><span class="badge">none</span><div>' +
+      '<h4>No provenance signals found</h4><p>The file carries no AI generator tags, ' +
+      'no Content Credentials, and no camera metadata.</p></div></div>';
+  }
+
+  if (r.reduced_mode) {
+    html += '<div class="disclaimer"><b>Reduced metadata mode.</b> ExifTool is not ' +
+      'installed on this computer, so ClearMark is reading metadata with Python only ' +
+      'and sees fewer fields — mainly for videos and XMP data. Installing ExifTool ' +
+      '(exiftool.org) makes this check noticeably more thorough. Everything reported ' +
+      'above is still accurate.</div>';
+  }
+
+  html += '<div class="disclaimer"><b>How to read this.</b> ClearMark reports what the ' +
+    'file itself declares — Content Credentials (C2PA), EXIF, XMP and generator tags. ' +
+    'Metadata is strong evidence when present, but any screenshot, re-encode or social ' +
+    'upload strips it, so <b>“Inconclusive” never means “authentic.”</b> ClearMark cannot ' +
+    'read invisible watermarks such as Google SynthID — to check those, use Google\'s own ' +
+    '“About this image” in Search or the Gemini app. For a signed Content Credentials ' +
+    'history, upload the file to contentcredentials.org/verify.</div>';
+
+  const keys = Object.keys(r.metadata || {});
+  if (keys.length) {
+    html += '<details class="rawmeta"><summary>All metadata read from this file (' +
+      r.metadata_count + ' fields)</summary><div class="metatable">';
+    for (const k of keys) {
+      html += '<div><span class="k">' + esc(k) + '</span><span class="v">' +
+        esc(r.metadata[k]) + '</span></div>';
+    }
+    html += '</div></details>';
+  }
+
+  detectBody.innerHTML = html;
+}
+</script>
+</body>
+</html>
