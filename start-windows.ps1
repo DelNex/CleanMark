@@ -73,6 +73,9 @@ try {
 
     if (!(Test-PythonVersion $VenvPython)) { throw 'The local Python environment could not be started.' }
 
+    Write-Host 'Checking GitHub for ClearMark updates...'
+    & $VenvPython (Join-Path $AppDirectory 'update.py')
+
     Write-Host 'Installing ClearMark dependencies...'
     if ($HasUv -or (Test-Path -LiteralPath $UvPath -PathType Leaf)) {
         & $UvPath pip install --python $VenvPython -r (Join-Path $AppDirectory 'requirements.txt')

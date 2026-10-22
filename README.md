@@ -26,7 +26,7 @@ needed after the one-time setup.
 **The easy way (recommended).** If you have `git`, clone it:
 
 ```bash
-git clone https://github.com/dataengineer-amar/ClearMark.git
+git clone https://github.com/DelNex/CleanMark.git
 ```
 
 Clone or extract the project, then use the platform launcher below.
@@ -47,6 +47,12 @@ system packages for the native window.
 
 The launchers install required packages and fetch the LaMa model on first run.
 ClearMark opens in its own desktop window.
+
+At each launch, ClearMark checks the GitHub `main` branch and automatically applies
+newer changes before starting. Git checkouts are updated only when their working tree
+is clean; packaged installs update their application files while preserving the local
+Python environment and optional tools. If GitHub is unavailable, the installed copy
+starts as usual and the updater retries on the next launch.
 
 Closing the desktop window stops ClearMark.
 
@@ -142,7 +148,8 @@ Your files never leave your computer. That isn't a promise, it's how it's built:
 - Files you drop in are held in a temporary folder only while being processed, then
   deleted automatically.
 
-The only time ClearMark uses the internet is the one-time setup.
+ClearMark uses the internet for initial setup and to check for application updates at
+launch. Watermark processing stays on your computer.
 
 ---
 

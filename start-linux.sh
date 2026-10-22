@@ -151,6 +151,9 @@ if [ ! -x "$VENV_PY" ]; then
   fail "The local Python environment was not created."
 fi
 
+echo "  Checking GitHub for ClearMark updates..."
+"$VENV_PY" "$APP_DIR/update.py"
+
 echo "  Installing required packages..."
 if [ "$USE_UV" = 1 ]; then
   "$UV_BIN" pip install --python "$VENV_PY" -r requirements.txt ||
