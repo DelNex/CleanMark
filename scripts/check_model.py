@@ -1,7 +1,13 @@
 """Initialize the LaMa model before starting the desktop application."""
 from pathlib import Path
+import sys
 
 import torch
+
+# Running a script by filename puts ``scripts`` at sys.path[0], not the app
+# directory. Add the project root so the app's remover module is importable.
+APP_DIRECTORY = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(APP_DIRECTORY))
 
 
 def main() -> None:
