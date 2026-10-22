@@ -14,8 +14,8 @@ Two tools in one small app:
 2. **AI Content Check** — inspect a file's own metadata to see whether it declares
    being AI-generated, camera-shot, or neither.
 
-Nothing is ever uploaded. There is no account, no fee, and no internet connection
-needed after the one-time setup.
+Nothing is ever uploaded. There is no account or fee. Internet is used for first-run
+setup and automatic update checks when the app starts.
 
 ---
 
@@ -37,7 +37,8 @@ your operating system, so Windows may show a SmartScreen prompt on first launch.
 ### Step 1 — Start ClearMark
 
 - **Windows:** double-click **`Start ClearMark (Windows).bat`**.
-- **Linux:** run `./start.sh` or `./start-linux.sh`.
+- **Linux:** run `./start.sh`. The explicit `./start-linux.sh` entry point is kept for
+  compatibility.
 
 The launcher prepares the Python environment. If Python 3.10 or newer is missing,
 it downloads a private Python 3.12 runtime into the ClearMark folder using the
@@ -74,7 +75,7 @@ code-signing certificate, which is true of most small and open-source tools.
 
 Clear it **before extracting** — that way every file comes out clean in one go:
 
-1. Right-click the downloaded **`ClearMark-Share.zip`**
+1. Right-click the downloaded ClearMark ZIP archive
 2. Choose **Properties**
 3. At the bottom of the General tab, tick **Unblock**
 4. Click **OK**
@@ -160,8 +161,8 @@ thorough, especially for videos. During setup, the launcher asks whether to down
 into the ClearMark folder. Type **Y** to install or press Enter to skip. Linux needs
 Perl to run ExifTool; Windows downloads its self-contained executable. ClearMark works
 fine without it and reports when it is running in reduced mode.
-If you skip it and want it later, run `.venv/bin/python install_optional.py exiftool`
-on Linux or `.venv\Scripts\python.exe install_optional.py exiftool` on Windows.
+If you skip it and want it later, run `.venv/bin/python scripts/install_optional.py exiftool`
+on Linux or `.venv\Scripts\python.exe scripts/install_optional.py exiftool` on Windows.
 
 ---
 
@@ -196,7 +197,7 @@ desktop.py      native desktop window and lifecycle
 app.py          Flask server factory and API
 remover.py      LaMa inpainting engine (images + video)
 detector.py     provenance / metadata analysis
-install_optional.py   downloads ExifTool if selected
+scripts/        updater, optional tools, and platform integration helpers
 start-windows.ps1     Windows setup and launch flow
 static/         self-contained web UI, bundled Sofia Sans font
 requirements.txt

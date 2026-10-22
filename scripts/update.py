@@ -12,7 +12,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path, PurePosixPath
 
-APP_DIR = Path(__file__).resolve().parent
+APP_DIR = Path(__file__).resolve().parent.parent
 REPOSITORY = "DelNex/CleanMark"
 BRANCH = "main"
 API = f"https://api.github.com/repos/{REPOSITORY}"
@@ -144,6 +144,21 @@ def archive_update() -> bool:
             destination.parent.mkdir(parents=True, exist_ok=True)
             os.replace(source, destination)
         revision_file.write_text(latest + "\n", encoding="ascii")
+
+        # Remove helpers left behind by versions that stored these scripts at
+        # the project root. Keep the public launchers there for compatibility.
+        for legacy_name in (
+            "bootstrap-uv.ps1",
+            "install_optional.py",
+            "register-linux-app.py",
+            "register-windows-app.ps1",
+            "update.py",
+        ):
+            try:
+                (APP_DIR / legacy_name).unlink(missing_ok=True)
+            except OSError:
+                # A locked legacy file is harmless; the new launcher uses scripts/.
+                pass
 
     print("ClearMark updated from GitHub.")
     return True

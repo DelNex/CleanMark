@@ -152,7 +152,7 @@ if [ ! -x "$VENV_PY" ]; then
 fi
 
 echo "  Checking GitHub for ClearMark updates..."
-"$VENV_PY" "$APP_DIR/update.py"
+"$VENV_PY" "$APP_DIR/scripts/update.py"
 
 echo "  Installing required packages..."
 if [ "$USE_UV" = 1 ]; then
@@ -177,7 +177,7 @@ if [ ! -e "$OPTIONAL_SKIP" ] &&
   read -r -p "  Install optional ExifTool for richer metadata checks? [y/N] " answer
   case "$answer" in
     [yY]|[yY][eE][sS])
-      if ! "$VENV_PY" install_optional.py exiftool; then
+      if ! "$VENV_PY" scripts/install_optional.py exiftool; then
         echo "  ExifTool could not be installed; metadata checks will use reduced mode."
       fi
       ;;
@@ -190,7 +190,7 @@ if [ ! -e "$OPTIONAL_SKIP" ] &&
 fi
 
 echo "  Adding ClearMark to Linux app search..."
-"$VENV_PY" register-linux-app.py "$APP_DIR" "$VENV_PY" ||
+"$VENV_PY" scripts/register-linux-app.py "$APP_DIR" "$VENV_PY" ||
   echo "  App search registration failed; ClearMark can still start here."
 
 echo "  Starting the ClearMark desktop window."

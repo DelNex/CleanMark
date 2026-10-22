@@ -89,7 +89,7 @@ try {
             if (!$HasUv) {
                 Write-Host 'Downloading the small uv setup tool...'
                 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
-                    (Join-Path $AppDirectory 'bootstrap-uv.ps1') -InstallDirectory $AppDirectory | Out-Null
+                    (Join-Path $AppDirectory 'scripts\bootstrap-uv.ps1') -InstallDirectory $AppDirectory | Out-Null
                 if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $UvPath -PathType Leaf)) {
                     throw 'Could not download uv. Check your internet connection and try again.'
                 }
@@ -105,7 +105,7 @@ try {
     if (!(Test-PythonVersion $VenvPython)) { throw 'The local Python environment could not be started.' }
 
     Write-Host 'Checking GitHub for ClearMark updates...'
-    & $VenvPython (Join-Path $AppDirectory 'update.py')
+    & $VenvPython (Join-Path $AppDirectory 'scripts\update.py')
 
     Write-Host 'Installing ClearMark dependencies...'
     if ($HasUv -or (Test-Path -LiteralPath $UvPath -PathType Leaf)) {
@@ -127,7 +127,7 @@ try {
     if ($LASTEXITCODE -ne 0 -and !(Test-Path -LiteralPath $OptionalSkip)) {
         $Answer = Read-Host 'Install optional ExifTool for richer metadata checks? [y/N]'
         if ($Answer -match '^(y|yes)$') {
-            & $VenvPython (Join-Path $AppDirectory 'install_optional.py') exiftool
+            & $VenvPython (Join-Path $AppDirectory 'scripts\install_optional.py') exiftool
             if ($LASTEXITCODE -ne 0) { Write-Host 'ExifTool was skipped; metadata checks will use reduced mode.' }
         } else {
             New-Item -ItemType Directory -Path $RuntimeDirectory -Force | Out-Null
@@ -138,7 +138,7 @@ try {
 
     Write-Host 'Adding ClearMark to Windows Start search...'
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
-        (Join-Path $AppDirectory 'register-windows-app.ps1') -InstallDirectory $AppDirectory
+        (Join-Path $AppDirectory 'scripts\register-windows-app.ps1') -InstallDirectory $AppDirectory
     if ($LASTEXITCODE -ne 0) { Write-Host 'Start Menu registration failed; ClearMark can still start here.' }
 
     Write-Host 'Starting the ClearMark desktop window...'
