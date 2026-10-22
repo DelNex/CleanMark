@@ -130,15 +130,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Could not install ClearMark dependencies.' }
 
     Write-Host 'Checking PyTorch and the LaMa AI model (first run may download about 200 MB)...'
-    $ModelSetup = @'
-from pathlib import Path
-import torch
-model = Path(torch.hub.get_dir()) / "checkpoints" / "big-lama.pt"
-if not model.is_file():
-    import remover
-    remover._get_lama()
-'@
-    Invoke-NativeCapture $VenvPython @('-c', $ModelSetup)
+    $ModelSetup = Join-Path $AppDirectory 'scripts\check_model.py'
+    Invoke-NativeCapture $VenvPython @($ModelSetup)
     if ($script:NativeOutput) { $script:NativeOutput | ForEach-Object { Write-Host "$_" } }
     New-Item -ItemType Directory -Path $RuntimeDirectory -Force | Out-Null
     $ModelLog = Join-Path $RuntimeDirectory 'model-setup.log'
