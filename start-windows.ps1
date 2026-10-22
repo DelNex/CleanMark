@@ -59,6 +59,20 @@ function Find-SystemPython {
     return $null
 }
 
+function Invoke-NativeCapture([string] $Executable, [string[]] $ArgumentList) {
+    # In Windows PowerShell, native stderr is mapped to PowerShell's error
+    # stream. With ErrorActionPreference=Stop that can hide a Python traceback
+    # behind only its first line, so capture it and report the real exit code.
+    $PreviousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $script:NativeOutput = & $Executable @ArgumentList 2>&1
+        $script:NativeExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $PreviousPreference
+    }
+}
+
 try {
     $RuntimeDirectory = Join-Path $AppDirectory '.runtime'
     $Uv = Get-Command uv.exe -ErrorAction SilentlyContinue
@@ -115,11 +129,22 @@ try {
     }
     if ($LASTEXITCODE -ne 0) { throw 'Could not install ClearMark dependencies.' }
 
-    & $VenvPython -c 'import torch; from pathlib import Path; raise SystemExit(0 if (Path(torch.hub.get_dir()) / "checkpoints" / "big-lama.pt").is_file() else 1)' *> $null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host 'Downloading the LaMa AI model (~200 MB, one time)...'
-        & $VenvPython -c 'import remover; remover._get_lama()'
-        if ($LASTEXITCODE -ne 0) { throw 'Could not download the AI model. Run this launcher again to retry.' }
+    Write-Host 'Checking PyTorch and the LaMa AI model (first run may download about 200 MB)...'
+    $ModelSetup = @'
+from pathlib import Path
+import torch
+model = Path(torch.hub.get_dir()) / "checkpoints" / "big-lama.pt"
+if not model.is_file():
+    import remover
+    remover._get_lama()
+'@
+    Invoke-NativeCapture $VenvPython @('-c', $ModelSetup)
+    if ($script:NativeOutput) { $script:NativeOutput | ForEach-Object { Write-Host "$_" } }
+    New-Item -ItemType Directory -Path $RuntimeDirectory -Force | Out-Null
+    $ModelLog = Join-Path $RuntimeDirectory 'model-setup.log'
+    ($script:NativeOutput | Out-String) | Set-Content -LiteralPath $ModelLog -Encoding UTF8
+    if ($script:NativeExitCode -ne 0) {
+        throw "PyTorch or the LaMa model failed to initialize. Full output is saved to $ModelLog."
     }
 
     $OptionalSkip = Join-Path $RuntimeDirectory 'exiftool-skipped'
@@ -142,8 +167,15 @@ try {
     if ($LASTEXITCODE -ne 0) { Write-Host 'Start Menu registration failed; ClearMark can still start here.' }
 
     Write-Host 'Starting the ClearMark desktop window...'
-    & $VenvPython (Join-Path $AppDirectory 'desktop.py')
-    if ($LASTEXITCODE -ne 0) { throw 'ClearMark closed with an error.' }
+    $PreviousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $VenvPython (Join-Path $AppDirectory 'desktop.py')
+        $DesktopExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $PreviousPreference
+    }
+    if ($DesktopExitCode -ne 0) { throw 'ClearMark closed with an error. The complete traceback is shown above.' }
 } catch {
     Write-Host "`nClearMark setup/start failed: $($_.Exception.Message)" -ForegroundColor Red
     if ([Environment]::UserInteractive) { Read-Host 'Press Enter to close' | Out-Null }
