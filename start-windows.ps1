@@ -4,25 +4,56 @@ Set-Location -LiteralPath $AppDirectory
 
 function Test-PythonVersion([string] $PythonPath) {
     if (!(Test-Path -LiteralPath $PythonPath -PathType Leaf)) { return $false }
-    & $PythonPath -c 'import sys; raise SystemExit(0 if sys.version_info >= (3,10) else 1)' *> $null
-    return ($LASTEXITCODE -eq 0)
+    $PreviousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $PythonPath -c 'import sys; raise SystemExit(0 if sys.version_info >= (3,10) else 1)' *> $null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        # Windows Store app-execution aliases often emit an error when invoked
+        # as Python. Treat that as "not installed" so the managed runtime path runs.
+        return $false
+    } finally {
+        $ErrorActionPreference = $PreviousPreference
+    }
 }
 
 function Find-SystemPython {
     $PyLauncher = Get-Command py.exe -ErrorAction SilentlyContinue
     if ($PyLauncher) {
-        foreach ($Version in @('-3.14', '-3.13', '-3.12', '-3.11', '-3.10', '-3')) {
-            $Found = & $PyLauncher.Source $Version -c 'import sys; print(sys.executable)' 2>$null
-            if ($LASTEXITCODE -eq 0 -and $Found -and (Test-PythonVersion $Found.Trim())) {
-                return $Found.Trim()
+        $PreviousPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            foreach ($Version in @('-3.14', '-3.13', '-3.12', '-3.11', '-3.10', '-3')) {
+                $Found = & $PyLauncher.Source $Version -c 'import sys; print(sys.executable)' 2>$null
+                if ($LASTEXITCODE -eq 0 -and $Found -and (Test-PythonVersion $Found.Trim())) {
+                    return $Found.Trim()
+                }
             }
+        } catch {
+            # The launcher may exist without any registered Python runtime.
+        } finally {
+            $ErrorActionPreference = $PreviousPreference
         }
     }
     $PythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue
     if ($PythonCommand) {
-        $Found = & $PythonCommand.Source -c 'import sys; print(sys.executable)' 2>$null
-        if ($LASTEXITCODE -eq 0 -and $Found -and (Test-PythonVersion $Found.Trim())) {
-            return $Found.Trim()
+        $PythonPath = $PythonCommand.Source
+        # Do not execute the Microsoft Store placeholder in WindowsApps. It is
+        # a command alias, not a usable interpreter, and may raise a PowerShell error.
+        if ($PythonPath -notmatch '(?i)\\Microsoft\\WindowsApps\\python(?:3(?:\.\d+)?)?\.exe$') {
+            $PreviousPreference = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try {
+                $Found = & $PythonPath -c 'import sys; print(sys.executable)' 2>$null
+                if ($LASTEXITCODE -eq 0 -and $Found -and (Test-PythonVersion $Found.Trim())) {
+                    return $Found.Trim()
+                }
+            } catch {
+                # Continue to the private Python download if this command is a shim.
+            } finally {
+                $ErrorActionPreference = $PreviousPreference
+            }
         }
     }
     return $null
