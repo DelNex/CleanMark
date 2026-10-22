@@ -97,19 +97,23 @@ def create_app(work_dir: Path | str | None = None, auth_token: str | None = None
     @app.get("/info")
     def info():
         import os
+        gpu_status = "torch_error"
         try:
             import torch
             if torch.cuda.is_available():
                 device, accel = "cuda", torch.cuda.get_device_name(0)
+                gpu_status = "available"
             elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
                 device, accel = "mps", ""
+                gpu_status = "available"
             else:
                 device, accel = "cpu", ""
-        except ImportError:
+                gpu_status = "cpu_build" if torch.version.cuda is None else "cuda_unavailable"
+        except Exception:
             device, accel = "cpu", ""
         return {"device": device, "accelerator": accel, "chip": _cpu_name(),
                 "cores": os.cpu_count(), "os": platform.system(),
-                "exiftool": exiftool_path() is not None}
+                "exiftool": exiftool_path() is not None, "gpu_status": gpu_status}
 
     def run_job(job_id: str, src: Path, dst: Path, box):
         jobs = app.config["JOBS"]

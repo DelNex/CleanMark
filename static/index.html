@@ -415,6 +415,14 @@ fetch('/info').then(r => r.json()).then(i => {
   document.getElementById('techLine').textContent =
     'ClearMark · ' + tech + ' · 100% local processing';
   if (i.device === 'cpu') {
+    const note = document.getElementById('cpuNote');
+    if (i.gpu_status === 'cpu_build') {
+      note.innerHTML = '<b>CUDA support is not active.</b> If this PC has an NVIDIA GPU, close ClearMark and run its launcher again to install the CUDA-enabled PyTorch build.';
+    } else if (i.gpu_status === 'cuda_unavailable') {
+      note.innerHTML = '<b>CUDA-enabled PyTorch is installed, but it cannot access an NVIDIA GPU.</b> Update the NVIDIA driver, then restart ClearMark.';
+    } else if (i.gpu_status === 'torch_error') {
+      note.innerHTML = '<b>PyTorch could not initialize GPU support.</b> Check the startup log, update the NVIDIA driver, then restart ClearMark.';
+    }
     document.getElementById('cpuNote').style.display = 'block';
   }
 }).catch(() => {

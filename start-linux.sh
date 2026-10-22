@@ -154,6 +154,15 @@ fi
 echo "  Checking GitHub for ClearMark updates..."
 "$VENV_PY" "$APP_DIR/scripts/update.py"
 
+echo "  Checking for an NVIDIA GPU and matching PyTorch support..."
+if [ "$USE_UV" = 1 ]; then
+  "$VENV_PY" scripts/ensure_torch_gpu.py --uv "$UV_BIN" ||
+    fail "Could not install the required PyTorch package."
+else
+  "$VENV_PY" scripts/ensure_torch_gpu.py ||
+    fail "Could not install the required PyTorch package."
+fi
+
 echo "  Installing required packages..."
 if [ "$USE_UV" = 1 ]; then
   "$UV_BIN" pip install --python "$VENV_PY" -r requirements.txt ||

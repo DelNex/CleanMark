@@ -121,6 +121,16 @@ try {
     Write-Host 'Checking GitHub for ClearMark updates...'
     & $VenvPython (Join-Path $AppDirectory 'scripts\update.py')
 
+    Write-Host 'Checking for an NVIDIA GPU and matching PyTorch support...'
+    $TorchSetup = Join-Path $AppDirectory 'scripts\ensure_torch_gpu.py'
+    if ($HasUv -or (Test-Path -LiteralPath $UvPath -PathType Leaf)) {
+        Invoke-NativeCapture $VenvPython @($TorchSetup, '--uv', $UvPath)
+    } else {
+        Invoke-NativeCapture $VenvPython @($TorchSetup)
+    }
+    if ($script:NativeOutput) { $script:NativeOutput | ForEach-Object { Write-Host "$_" } }
+    if ($script:NativeExitCode -ne 0) { throw 'Could not install the required PyTorch package.' }
+
     Write-Host 'Installing ClearMark dependencies...'
     if ($HasUv -or (Test-Path -LiteralPath $UvPath -PathType Leaf)) {
         & $UvPath pip install --python $VenvPython -r (Join-Path $AppDirectory 'requirements.txt')

@@ -179,6 +179,12 @@ the files together.
 **Python setup fails** — check your internet connection and run the launcher again. If
 the private runtime download is blocked, install Python 3.10 or newer manually and retry.
 
+**ClearMark shows CPU on a Windows or Linux PC with an NVIDIA GPU** — run ClearMark
+from its launcher while the NVIDIA driver is installed. The launcher checks `nvidia-smi`
+and installs the CUDA-enabled PyTorch build when needed. The CUDA runtime comes with
+PyTorch; the NVIDIA driver is still required. If startup says CUDA is unavailable, update
+the NVIDIA driver and launch ClearMark again.
+
 **Setup fails partway** — check your internet connection and run the launcher again.
 The environment and downloaded model stay in place so completed setup work can be reused.
 
